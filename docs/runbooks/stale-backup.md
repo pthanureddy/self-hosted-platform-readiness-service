@@ -2,11 +2,11 @@
 
 ## Evidence to preserve
 
-Record inventory scope, bucket/key, object timestamp and size, encryption/checksum metadata, backup job result, retention policy, recovery objectives, and latest isolated restore-test record. Do not download data into an unapproved environment.
+Record inventory scope, logical stream, bucket/key, object timestamp and size, encryption/checksum metadata, backup job result, retention policy, recovery objectives, and latest isolated restore-test record. Do not download data into an unapproved environment.
 
 ## Read-only checks
 
-1. Confirm the export represents the complete expected prefix and latest version.
+1. Confirm the caller-assigned stream is correct and the export contains the stream's complete expected prefix and latest version.
 2. Read scheduler history and failure events.
 3. Inspect object metadata, versioning, retention/immutability, and encryption policy with read-only API calls.
 4. Compare age to an approved RPO, not the example threshold alone.
@@ -23,4 +23,3 @@ Escalate immediately when a complete inventory confirms missed RPO, required enc
 ## Change and rollback boundary
 
 Never overwrite, delete, expire, restore over production, or weaken immutability during triage. Run restores only in an isolated approved destination with capacity, access controls, integrity criteria, cleanup plan, and named owner.
-

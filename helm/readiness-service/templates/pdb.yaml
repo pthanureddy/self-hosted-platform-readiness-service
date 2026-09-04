@@ -1,9 +1,11 @@
 {{- if .Values.podDisruptionBudget.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
-metadata: {name: readiness-service}
+metadata:
+  name: {{ include "readiness.fullname" . }}
 spec:
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
-  selector: {matchLabels: {app.kubernetes.io/name: readiness-service}}
+  selector:
+    matchLabels:
+      {{- include "readiness.selectorLabels" . | nindent 6 }}
 {{- end }}
-

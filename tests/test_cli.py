@@ -51,7 +51,8 @@ def test_cli_invalid_json(capsys, tmp_path: Path) -> None:
     source = tmp_path / "snapshot.json"
     source.write_text("{bad", encoding="utf-8")
     assert run([str(source)]) == 2
-    assert "invalid_snapshot" in capsys.readouterr().err
+    error = json.loads(capsys.readouterr().err)
+    assert error == {"error": "invalid_json", "line": 1, "column": 2}
 
 
 def test_cli_invalid_schema(capsys, tmp_path: Path) -> None:
@@ -63,4 +64,31 @@ def test_cli_invalid_schema(capsys, tmp_path: Path) -> None:
 
 def test_cli_missing_file(capsys, tmp_path: Path) -> None:
     assert run([str(tmp_path / "missing.json")]) == 2
-    assert "invalid_snapshot" in capsys.readouterr().err
+    assert json.loads(capsys.readouterr().err) == {"error": "snapshot_unreadable"}
+
+
+def test_cli_validation_error_does_not_echo_input_value(
+    capsys, tmp_path: Path, healthy_dict: dict
+) -> None:
+    secret_value = "credential-that-must-not-be-echoed"
+    healthy_dict["metadata"]["unexpected_token"] = secret_value
+    source = tmp_path / "snapshot.json"
+    source.write_text(json.dumps(healthy_dict), encoding="utf-8")
+    assert run([str(source)]) == 2
+    serialized = capsys.readouterr().err
+    assert secret_value not in serialized
+    error = json.loads(serialized)
+    assert error["error"] == "invalid_snapshot"
+    assert {"path": "metadata.unexpected_token", "type": "extra_forbidden"} in error["issues"]
+
+
+def test_cli_validation_issues_are_capped(capsys, tmp_path: Path, healthy_dict: dict) -> None:
+    for index in range(25):
+        healthy_dict[f"unexpected_{index}"] = index
+    source = tmp_path / "snapshot.json"
+    source.write_text(json.dumps(healthy_dict), encoding="utf-8")
+    assert run([str(source)]) == 2
+    error = json.loads(capsys.readouterr().err)
+    assert len(error["issues"]) == 20
+    assert error["total_issues"] == 25
+    assert error["truncated"] is True

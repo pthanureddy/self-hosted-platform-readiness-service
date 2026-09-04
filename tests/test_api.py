@@ -56,6 +56,27 @@ def test_validation_error_is_bounded(client: TestClient, healthy_dict: dict[str,
     assert response.json()["request_id"] == "validation-1"
 
 
+def test_generated_validation_request_id_matches_header(
+    client: TestClient, healthy_dict: dict[str, Any]
+) -> None:
+    healthy_dict["metadata"]["captured_at"] = "2026-09-04T10:00:00"
+    response = client.post("/v1/analyze", json=healthy_dict)
+    assert response.status_code == 422
+    assert response.json()["request_id"] == response.headers["x-request-id"]
+    assert response.json()["request_id"] != "unknown"
+
+
+def test_validation_issues_are_capped(client: TestClient, healthy_dict: dict[str, Any]) -> None:
+    for index in range(25):
+        healthy_dict[f"unexpected_{index}"] = index
+    response = client.post("/v1/analyze", json=healthy_dict)
+    body = response.json()
+    assert response.status_code == 422
+    assert len(body["issues"]) == 20
+    assert body["total_issues"] == 25
+    assert body["truncated"] is True
+
+
 def test_metrics_endpoint(client: TestClient) -> None:
     client.get("/health/live")
     response = client.get("/metrics")

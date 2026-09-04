@@ -1,19 +1,25 @@
+{{- $image := printf "%s:%s" .Values.image.repository .Values.image.tag -}}
+{{- if .Values.image.digest -}}
+{{- $image = printf "%s@%s" .Values.image.repository .Values.image.digest -}}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "readiness.name" . }}
+  name: {{ include "readiness.fullname" . }}
   labels:
     {{- include "readiness.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
   selector:
-    matchLabels: {app.kubernetes.io/name: readiness-service}
+    matchLabels:
+      {{- include "readiness.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: {app.kubernetes.io/name: readiness-service}
+      labels:
+        {{- include "readiness.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "readiness.name" . }}
+      serviceAccountName: {{ include "readiness.fullname" . }}
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
@@ -23,7 +29,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: readiness
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ $image | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports: [{name: http, containerPort: 8080, protocol: TCP}]
           env:
@@ -43,4 +49,3 @@ spec:
       nodeSelector: {{- toYaml .Values.nodeSelector | nindent 8 }}
       tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
       affinity: {{- toYaml .Values.affinity | nindent 8 }}
-

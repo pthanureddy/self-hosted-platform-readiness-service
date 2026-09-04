@@ -5,11 +5,9 @@ spec:
   project: default
   source:
     repoURL: https://github.com/pthanureddy/self-hosted-platform-readiness-service.git
-    targetRevision: main
+    targetRevision: v0.1.0
     path: helm/readiness-service
     helm: {valueFiles: [values.yaml, values-onprem.yaml]}
   destination: {server: https://kubernetes.default.svc, namespace: readiness-onprem}
   syncPolicy:
-    automated: {prune: false, selfHeal: false}
     syncOptions: [CreateNamespace=true]
-

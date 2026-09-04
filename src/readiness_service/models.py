@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-NonNegativeInt = Annotated[int, Field(ge=0)]
-NonNegativeFloat = Annotated[float, Field(ge=0)]
+NonNegativeInt = Annotated[int, Field(ge=0, le=2_147_483_647)]
+NonNegativeFloat = Annotated[float, Field(ge=0, le=1_000_000_000, allow_inf_nan=False)]
+ByteSize = Annotated[int, Field(ge=0, le=9_007_199_254_740_991)]
+LatencyMilliseconds = Annotated[float, Field(ge=0, le=3_600_000, allow_inf_nan=False)]
+MAX_VALIDATION_ISSUES = 20
 
 
 class StrictModel(BaseModel):
@@ -28,7 +30,7 @@ class Severity(StrEnum):
 
 class SnapshotMetadata(StrictModel):
     snapshot_id: Annotated[str, Field(min_length=1, max_length=128)]
-    captured_at: datetime
+    captured_at: AwareDatetime
     environment: Annotated[str, Field(min_length=1, max_length=64)]
     source_version: Annotated[str, Field(min_length=1, max_length=64)] = "unknown"
 
@@ -57,7 +59,7 @@ class ArgoApplication(StrictModel):
     sync_status: Literal["Synced", "OutOfSync", "Unknown"]
     health_status: Literal["Healthy", "Progressing", "Degraded", "Suspended", "Missing", "Unknown"]
     operation_phase: Literal["Succeeded", "Running", "Failed", "Error", "Unknown"] = "Unknown"
-    reconciled_at: datetime | None = None
+    reconciled_at: AwareDatetime | None = None
 
 
 class RabbitMQQueue(StrictModel):
@@ -73,23 +75,44 @@ class RabbitMQQueue(StrictModel):
 
 class BackupObject(StrictModel):
     bucket: Annotated[str, Field(min_length=1, max_length=255)]
+    stream: Annotated[str, Field(min_length=1, max_length=255)]
     key: Annotated[str, Field(min_length=1, max_length=1024)]
-    created_at: datetime
-    size_bytes: NonNegativeInt
+    created_at: AwareDatetime
+    size_bytes: ByteSize
     checksum_present: bool
     encrypted: bool
-    restore_verified_at: datetime | None = None
+    restore_verified_at: AwareDatetime | None = None
 
 
 class ProbeResult(StrictModel):
     target: Annotated[str, Field(min_length=1, max_length=2048)]
     probe_type: Literal["dns", "http", "tls"]
     success: bool
-    latency_ms: NonNegativeFloat | None = None
+    latency_ms: LatencyMilliseconds | None = None
     status_code: Annotated[int, Field(ge=100, le=599)] | None = None
     dns_answers: list[str] = Field(default_factory=list, max_length=64)
-    certificate_expires_at: datetime | None = None
+    certificate_expires_at: AwareDatetime | None = None
     error_code: Annotated[str, Field(pattern=r"^[A-Z0-9_\-]{1,64}$")] | None = None
+
+    @model_validator(mode="after")
+    def validate_probe_fields(self) -> ProbeResult:
+        if self.success and self.error_code is not None:
+            raise ValueError("successful probes cannot include error_code")
+        if self.probe_type == "dns":
+            if self.status_code is not None or self.certificate_expires_at is not None:
+                raise ValueError("DNS probes cannot include HTTP or TLS result fields")
+            if self.success and not self.dns_answers:
+                raise ValueError("successful DNS probes must include at least one answer")
+        elif self.probe_type == "http":
+            if self.dns_answers or self.certificate_expires_at is not None:
+                raise ValueError("HTTP probes cannot include DNS answers or TLS certificate fields")
+            if self.success and self.status_code is None:
+                raise ValueError("successful HTTP probes must include status_code")
+        elif self.status_code is not None or self.dns_answers:
+            raise ValueError("TLS probes cannot include HTTP status or DNS answer fields")
+        elif self.success and self.certificate_expires_at is None:
+            raise ValueError("successful TLS probes must include certificate_expires_at")
+        return self
 
 
 class ObservabilityCoverage(StrictModel):
@@ -98,7 +121,7 @@ class ObservabilityCoverage(StrictModel):
     metrics: bool
     traces: bool
     alerts: bool
-    last_signal_at: datetime | None = None
+    last_signal_at: AwareDatetime | None = None
     alerts_last_hour: NonNegativeInt = 0
 
 
@@ -135,7 +158,7 @@ class AnalysisSummary(StrictModel):
 
 class AnalysisResult(StrictModel):
     snapshot_id: str
-    analyzed_at: datetime
+    analyzed_at: AwareDatetime
     findings: list[Finding]
     summary: AnalysisSummary
 
@@ -145,3 +168,5 @@ class ErrorDetail(StrictModel):
     message: str
     request_id: str
     issues: list[dict[str, Any]] = Field(default_factory=list)
+    total_issues: NonNegativeInt = 0
+    truncated: bool = False

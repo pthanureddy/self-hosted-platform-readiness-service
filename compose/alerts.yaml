@@ -2,7 +2,7 @@ groups:
   - name: readiness-service
     rules:
       - alert: ReadinessServiceUnavailable
-        expr: up{job="readiness"} == 0
+        expr: absent(up{job="readiness"}) == 1 or up{job="readiness"} == 0
         for: 5m
         labels: {severity: critical}
         annotations:
@@ -13,4 +13,3 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: Readiness analysis errors are occurring
-

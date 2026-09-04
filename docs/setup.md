@@ -21,7 +21,7 @@ docker compose up --build readiness otel-collector prometheus grafana
 docker compose --profile full up --build
 ```
 
-The full profile starts local single-process Mimir, Loki, and Tempo examples. All state is disposable. The collector defaults to its debug exporter so Tempo is not required by the base profile.
+The full profile starts local single-process Mimir, Loki, and Tempo configuration examples. All state is disposable. The collector exports traces to its debug exporter only, so Tempo is not required by the base profile. No Prometheus remote write, Loki log shipping, or remote Tempo export is configured.
 
 ## Helm
 
@@ -30,10 +30,14 @@ helm lint helm/readiness-service
 helm template readiness helm/readiness-service -f helm/readiness-service/values-kind.yaml
 helm upgrade --install readiness helm/readiness-service \
   --namespace readiness-service --create-namespace \
-  --values helm/readiness-service/values-onprem.yaml
+  --values helm/readiness-service/values-onprem.yaml \
+  --set image.repository=registry.example/readiness-service \
+  --set-string image.digest=sha256:REPLACE_WITH_VERIFIED_DIGEST
 ```
 
-Use an immutable image digest and reviewed environment-specific network policy in any controlled deployment. `values-kind.yaml` exists only for CI and disables CRD-dependent resources and network policy.
+Replace the repository and digest with a published, verified artifact. When `image.digest` is set, the chart renders `repository@digest` and ignores the tag for the workload reference. The repository does not publish that external image itself. Use a reviewed environment-specific network policy in any controlled deployment. `values-kind.yaml` exists only for CI and disables CRD-dependent resources and network policy.
+
+The Argo CD examples pin their source to `v0.1.0`. Managed and dedicated examples permit automated self-heal with pruning disabled; the on-prem example has no automated sync block and therefore requires an operator-controlled sync. A corresponding repository tag and external image must exist before using those examples.
 
 ## Terraform bootstrap
 
@@ -45,4 +49,3 @@ terraform -chdir=terraform test
 ```
 
 Review a real provider context and saved plan before any apply. The automated tests mock the Kubernetes provider and do not contact a cluster.
-

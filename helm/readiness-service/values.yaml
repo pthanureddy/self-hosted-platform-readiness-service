@@ -1,7 +1,10 @@
 replicaCount: 2
+nameOverride: ""
+fullnameOverride: ""
 image:
   repository: ghcr.io/pthanureddy/self-hosted-platform-readiness-service
   tag: "0.1.0"
+  digest: ""
   pullPolicy: IfNotPresent
 service:
   type: ClusterIP
@@ -18,9 +21,10 @@ otel:
   endpoint: ""
 serviceMonitor:
   enabled: false
+  labels: {}
 prometheusRule:
   enabled: false
+  labels: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
-

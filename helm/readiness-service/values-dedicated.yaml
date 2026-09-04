@@ -1,7 +1,6 @@
 replicaCount: 2
 podDisruptionBudget: {enabled: true, minAvailable: 1}
 otel: {endpoint: "http://otel-collector.observability:4318"}
-serviceMonitor: {enabled: true}
-prometheusRule: {enabled: true}
+serviceMonitor: {enabled: true, labels: {release: kube-prometheus-stack}}
+prometheusRule: {enabled: true, labels: {release: kube-prometheus-stack}}
 nodeSelector: {workload-tier: platform}
-

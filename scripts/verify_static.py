@@ -35,6 +35,8 @@ def main() -> int:
         "readOnlyRootFilesystem: true",
         'capabilities: {drop: ["ALL"]}',
         "automountServiceAccountToken: false",
+        ".Values.image.digest",
+        'include "readiness.fullname"',
     ):
         if required not in deployment:
             errors.append(f"Helm Deployment missing {required}")
@@ -46,9 +48,27 @@ def main() -> int:
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
         if document.get("kind") != "Application":
             errors.append(f"{path.relative_to(ROOT)} is not an Application")
-        prune = document.get("spec", {}).get("syncPolicy", {}).get("automated", {}).get("prune")
-        if prune is not False:
+        spec = document.get("spec", {})
+        if spec.get("source", {}).get("targetRevision") != "v0.1.0":
+            errors.append(f"{path.relative_to(ROOT)} must pin targetRevision to v0.1.0")
+        automated = spec.get("syncPolicy", {}).get("automated")
+        if path.stem == "onprem":
+            if automated is not None:
+                errors.append("on-prem Argo CD sync must remain manual")
+        elif not isinstance(automated, dict) or automated.get("prune") is not False:
             errors.append(f"{path.relative_to(ROOT)} must keep automated pruning disabled")
+
+    monitoring = (ROOT / "helm" / "readiness-service" / "templates" / "monitoring.yaml").read_text(
+        encoding="utf-8"
+    )
+    for required in (
+        ".Values.serviceMonitor.labels",
+        ".Values.prometheusRule.labels",
+        "absent(up",
+        'include "readiness.selectorLabels"',
+    ):
+        if required not in monitoring:
+            errors.append(f"Helm monitoring resources missing {required}")
 
     expected_runbooks = {
         "failing-workload.md",

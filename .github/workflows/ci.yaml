@@ -11,8 +11,8 @@ jobs:
   python-quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
         with: {python-version: "3.11", cache: pip}
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev,otel]"
@@ -24,12 +24,12 @@ jobs:
   build-and-static:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
         with: {python-version: "3.11"}
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5.0.1
         with: {version: v3.16.3}
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4.0.1
         with: {terraform_version: 1.10.4}
       - run: python -m pip install PyYAML
       - run: python scripts/verify_static.py
@@ -40,6 +40,10 @@ jobs:
           for values in values-kind.yaml values-managed.yaml values-dedicated.yaml values-onprem.yaml; do
             helm template readiness helm/readiness-service --values "helm/readiness-service/$values" >/dev/null
           done
+          helm template readiness helm/readiness-service \
+            --values helm/readiness-service/values-kind.yaml \
+            --set-string image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            | grep -q 'image: "readiness-service@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"'
       - working-directory: terraform
         run: terraform fmt -check -recursive
       - working-directory: terraform
@@ -52,18 +56,18 @@ jobs:
   kind-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: helm/kind-action@v1
+      - uses: actions/checkout@v7.0.1
+      - uses: helm/kind-action@v1.15.0
         with: {cluster_name: readiness-ci}
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5.0.1
         with: {version: v3.16.3}
       - run: docker build --tag readiness-service:kind .
       - run: kind load docker-image readiness-service:kind --name readiness-ci
       - run: helm install readiness helm/readiness-service --namespace readiness-ci --create-namespace --values helm/readiness-service/values-kind.yaml
-      - run: kubectl rollout status deployment/readiness-service --namespace readiness-ci --timeout=120s
+      - run: kubectl rollout status deployment/readiness-readiness-service --namespace readiness-ci --timeout=120s
       - name: Exercise deployed API
         run: |
-          kubectl port-forward --namespace readiness-ci service/readiness-service 18080:80 >port-forward.log 2>&1 &
+          kubectl port-forward --namespace readiness-ci service/readiness-readiness-service 18080:80 >port-forward.log 2>&1 &
           port_forward_pid=$!
           trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
@@ -73,5 +77,4 @@ jobs:
           response="$(curl --fail --silent --show-error -H 'content-type: application/json' --data-binary @fixtures/degraded-snapshot.json http://127.0.0.1:18080/v1/analyze)"
           echo "$response" | jq -e '.findings | any(.rule_id == "K8S-001")'
       - if: always()
-        run: kubectl get all --namespace readiness-ci && kubectl logs --namespace readiness-ci deployment/readiness-service || true
-
+        run: kubectl get all --namespace readiness-ci && kubectl logs --namespace readiness-ci deployment/readiness-readiness-service || true

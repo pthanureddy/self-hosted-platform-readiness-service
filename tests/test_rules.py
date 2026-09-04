@@ -45,22 +45,34 @@ def test_healthy_fixture_has_no_findings(healthy_dict: dict) -> None:
         (lambda d: d["backups"][0].update(restore_verified_at=None), "BKP-002"),
         (lambda d: d["backups"][0].update(checksum_present=False), "BKP-003"),
         (
-            lambda d: d["probes"][0].update(probe_type="dns", success=False, error_code="NXDOMAIN"),
+            lambda d: d["probes"][0].update(
+                probe_type="dns",
+                success=False,
+                status_code=None,
+                error_code="NXDOMAIN",
+            ),
             "NET-001",
         ),
         (
-            lambda d: d["probes"][0].update(probe_type="http", success=False, error_code="TIMEOUT"),
+            lambda d: d["probes"][0].update(
+                probe_type="http", success=False, status_code=503, error_code="UPSTREAM_503"
+            ),
             "NET-002",
         ),
         (
             lambda d: d["probes"][0].update(
-                probe_type="tls", success=False, error_code="HANDSHAKE"
+                probe_type="tls",
+                success=False,
+                status_code=None,
+                error_code="HANDSHAKE",
             ),
             "NET-003",
         ),
         (
             lambda d: d["probes"][0].update(
-                probe_type="tls", certificate_expires_at="2026-09-10T00:00:00Z"
+                probe_type="tls",
+                status_code=None,
+                certificate_expires_at="2026-09-10T00:00:00Z",
             ),
             "NET-004",
         ),
@@ -94,7 +106,7 @@ def test_twenty_restarts_is_high(healthy_dict: dict) -> None:
 
 def test_tls_three_days_is_high(healthy_dict: dict) -> None:
     healthy_dict["probes"][0].update(
-        probe_type="tls", certificate_expires_at="2026-09-07T10:00:00Z"
+        probe_type="tls", status_code=None, certificate_expires_at="2026-09-07T10:00:00Z"
     )
     result = analyze_snapshot(PlatformSnapshot.model_validate(healthy_dict), analyzed_at=NOW)
     assert result.findings[0].severity == "high"
@@ -149,3 +161,60 @@ def test_deterministic_order_and_summary(degraded_snapshot: PlatformSnapshot) ->
         )
         == first.summary.total
     )
+
+
+def test_succeeded_job_is_not_reported_unavailable(healthy_dict: dict) -> None:
+    healthy_dict["kubernetes_workloads"] = [
+        {
+            "namespace": "platform",
+            "name": "migration-complete",
+            "kind": "Job",
+            "desired_replicas": 1,
+            "ready_replicas": 0,
+            "available_replicas": 0,
+            "restart_count": 0,
+            "phase": "Succeeded",
+            "unavailable_seconds": 3600,
+        }
+    ]
+    assert not {"K8S-001", "K8S-002"}.intersection(codes(healthy_dict))
+
+
+def test_historical_backup_in_same_stream_is_not_evaluated(healthy_dict: dict) -> None:
+    historical = deepcopy(healthy_dict["backups"][0])
+    historical.update(
+        key="postgres/old.dump",
+        created_at="2025-01-01T00:00:00Z",
+        checksum_present=False,
+        encrypted=False,
+        restore_verified_at=None,
+    )
+    healthy_dict["backups"].append(historical)
+    assert not {"BKP-001", "BKP-002", "BKP-003"}.intersection(codes(healthy_dict))
+
+
+def test_each_backup_stream_evaluates_its_latest_object(healthy_dict: dict) -> None:
+    stale_stream = deepcopy(healthy_dict["backups"][0])
+    stale_stream.update(
+        stream="audit-archive",
+        key="audit/old.dump",
+        created_at="2025-01-01T00:00:00Z",
+        restore_verified_at=None,
+    )
+    healthy_dict["backups"].append(stale_stream)
+    result = analyze_snapshot(PlatformSnapshot.model_validate(healthy_dict), analyzed_at=NOW)
+    stale = [finding for finding in result.findings if finding.rule_id == "BKP-001"]
+    assert len(stale) == 1
+    assert stale[0].observed_evidence["stream"] == "audit-archive"
+
+
+def test_restore_evidence_is_evaluated_across_backup_stream(healthy_dict: dict) -> None:
+    historical = deepcopy(healthy_dict["backups"][0])
+    historical.update(
+        key="postgres/restored.dump",
+        created_at="2026-09-03T00:00:00Z",
+        restore_verified_at="2026-09-04T08:00:00Z",
+    )
+    healthy_dict["backups"][0]["restore_verified_at"] = None
+    healthy_dict["backups"].append(historical)
+    assert "BKP-002" not in codes(healthy_dict)

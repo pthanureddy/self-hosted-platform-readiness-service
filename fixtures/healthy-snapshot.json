@@ -20,7 +20,7 @@
   ],
   "argo_applications": [{"name":"platform","sync_status":"Synced","health_status":"Healthy","operation_phase":"Succeeded","reconciled_at":"2026-09-04T09:59:00Z"}],
   "rabbitmq_queues": [{"name":"jobs","messages_ready":0,"messages_unacked":0,"consumers":2,"publish_rate":1,"deliver_rate":1,"oldest_message_age_seconds":0}],
-  "backups": [{"bucket":"backups","key":"latest","created_at":"2026-09-04T09:00:00Z","size_bytes":1024,"checksum_present":true,"encrypted":true,"restore_verified_at":"2026-09-03T09:00:00Z"}],
+  "backups": [{"bucket":"backups","stream":"postgres-primary","key":"latest","created_at":"2026-09-04T09:00:00Z","size_bytes":1024,"checksum_present":true,"encrypted":true,"restore_verified_at":"2026-09-03T09:00:00Z"}],
   "probes": [{"target":"api.example.invalid","probe_type":"http","success":true,"latency_ms":10,"status_code":200}],
   "observability": [{"component":"api","logs":true,"metrics":true,"traces":true,"alerts":true,"last_signal_at":"2026-09-04T09:59:00Z","alerts_last_hour":2}]
 }

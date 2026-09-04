@@ -1,24 +1,37 @@
 {{- if .Values.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
-metadata: {name: readiness-service}
+metadata:
+  name: {{ include "readiness.fullname" . }}
+  labels:
+    {{- include "readiness.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
-  selector: {matchLabels: {app.kubernetes.io/name: readiness-service}}
+  selector:
+    matchLabels:
+      {{- include "readiness.selectorLabels" . | nindent 6 }}
   endpoints: [{port: http, path: /metrics, interval: 30s}]
 ---
 {{- end }}
 {{- if .Values.prometheusRule.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
-metadata: {name: readiness-service}
+metadata:
+  name: {{ include "readiness.fullname" . }}
+  labels:
+    {{- include "readiness.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   groups:
     - name: readiness-service
       rules:
         - alert: ReadinessServiceUnavailable
-          expr: up{job=~".*readiness-service.*"} == 0
+          expr: absent(up{service="{{ include "readiness.fullname" . }}"}) == 1 or up{service="{{ include "readiness.fullname" . }}"} == 0
           for: 5m
           labels: {severity: critical}
           annotations: {summary: Readiness service is unavailable}
 {{- end }}
-

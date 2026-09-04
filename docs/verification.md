@@ -1,6 +1,6 @@
 # Verification record
 
-Local verification was completed on 2026-09-04 before repository commits. The checks exercise the implementation and configuration; they are not evidence of a live external or production platform.
+Local verification was completed on 2026-09-04 for the current repository revision. The checks exercise the implementation and configuration; they are not evidence of a live external or production platform.
 
 ## Completed checks
 
@@ -9,19 +9,19 @@ Local verification was completed on 2026-09-04 before repository commits. The ch
 | Formatting | `ruff format --check .` | 28 files already formatted |
 | Lint | `ruff check .` | Passed |
 | Type safety | `mypy` | Passed; 9 source files |
-| Tests and coverage | `pytest -q` | 64 passed; 98.72% branch-aware coverage (334 statements, 56 branches) |
-| Static repository policy | `python scripts/verify_static.py` | Passed; 18 non-template YAML files parsed |
+| Tests and coverage | `pytest -q` | 93 passed; 97.15% branch-aware coverage (380 statements, 76 branches) |
+| Static repository policy | `python scripts/verify_static.py` | Passed; 18 non-template YAML files, 3 Argo Applications, and 5 runbooks checked |
 | Shell syntax | `bash -n scripts/diagnose.sh scripts/smoke.sh` | Passed with GNU Bash 5.2.37 |
 | Compose model | `docker compose config --quiet` | Passed |
 | Helm | `helm lint helm/readiness-service` | Passed; 1 chart |
-| Helm profiles | `helm template` with kind, managed, dedicated, and on-prem values | All 4 rendered |
+| Helm profiles | `helm template` with kind, managed, dedicated, and on-prem values | All 4 rendered; digest, release-specific-name, discovery-label, and absent-series alert assertions passed |
 | Terraform format | `terraform -chdir=terraform fmt -check -recursive` | Passed |
 | Terraform validation | `terraform -chdir=terraform validate` | Passed |
 | Terraform tests | `terraform -chdir=terraform test` | 2 passed, 0 failed with mocked Kubernetes provider |
 | Package | `python -m pip wheel --no-deps .` | Wheel built successfully |
 | CLI fixture | `readiness fixtures/degraded-snapshot.json --fail-on never` | Parsed; 13 ordered findings; first code `K8S-001` |
 
-The test suite covers model bounds and rejection, every rule family and threshold branches, deterministic ordering and summaries, API health/metrics/errors/OpenAPI behavior, CLI output and exit policies, logging setup, and optional tracing behavior.
+The test suite covers timezone-aware timestamps, finite bounded numbers, probe field semantics, backup stream selection, completed Jobs, every rule family and threshold branch, deterministic ordering and summaries, capped API/CLI validation errors, correlation IDs, health/metrics/OpenAPI behavior, CLI output/exit policies, logging setup, and optional tracing behavior.
 
 ## Environment-limited checks
 

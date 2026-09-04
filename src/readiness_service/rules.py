@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import HttpUrl
 
-from readiness_service.models import Finding, PlatformSnapshot, Severity
+from readiness_service.models import BackupObject, Finding, PlatformSnapshot, Severity
 
 RUNBOOK_BASE = (
     "https://github.com/pthanureddy/self-hosted-platform-readiness-service/blob/main/docs/runbooks"
@@ -42,7 +42,10 @@ def _finding(
 def kubernetes_findings(snapshot: PlatformSnapshot, _: datetime) -> Iterable[Finding]:
     for item in snapshot.kubernetes_workloads:
         resource = f"{item.namespace}/{item.kind}/{item.name}"
-        if item.phase == "Failed" or (item.desired_replicas > 0 and item.ready_replicas == 0):
+        completed_job = item.kind == "Job" and item.phase == "Succeeded"
+        if not completed_job and (
+            item.phase == "Failed" or (item.desired_replicas > 0 and item.ready_replicas == 0)
+        ):
             yield _finding(
                 "K8S-001",
                 Severity.CRITICAL if item.unavailable_seconds >= 900 else Severity.HIGH,
@@ -59,7 +62,7 @@ def kubernetes_findings(snapshot: PlatformSnapshot, _: datetime) -> Iterable[Fin
                 "failing-workload.md",
                 "Escalate when zero ready replicas persist for 15 minutes or a stated service objective is breached.",
             )
-        elif item.ready_replicas < item.desired_replicas:
+        elif not completed_job and item.ready_replicas < item.desired_replicas:
             yield _finding(
                 "K8S-002",
                 Severity.MEDIUM,
@@ -166,7 +169,17 @@ def rabbitmq_findings(snapshot: PlatformSnapshot, _: datetime) -> Iterable[Findi
 def backup_findings(snapshot: PlatformSnapshot, now: datetime) -> Iterable[Finding]:
     stale_before = now - timedelta(hours=25)
     restore_before = now - timedelta(days=30)
+    streams: dict[tuple[str, str], list[BackupObject]] = {}
     for backup in snapshot.backups:
+        streams.setdefault((backup.bucket, backup.stream), []).append(backup)
+
+    for stream_key in sorted(streams):
+        objects = streams[stream_key]
+        backup = max(objects, key=lambda item: (item.created_at, item.key))
+        restore_times = [
+            item.restore_verified_at for item in objects if item.restore_verified_at is not None
+        ]
+        latest_restore = max(restore_times, default=None)
         resource = f"s3://{backup.bucket}/{backup.key}"
         if backup.created_at < stale_before:
             yield _finding(
@@ -174,19 +187,28 @@ def backup_findings(snapshot: PlatformSnapshot, now: datetime) -> Iterable[Findi
                 Severity.HIGH,
                 resource,
                 "Latest supplied backup is stale",
-                {"created_at": backup.created_at, "age_threshold_hours": 25},
+                {
+                    "stream": backup.stream,
+                    "latest_created_at": backup.created_at,
+                    "objects_supplied": len(objects),
+                    "age_threshold_hours": 25,
+                },
                 "The supplied object is older than the policy threshold; this may be an incomplete export.",
                 "Confirm inventory scope and scheduler history without writing to the backup bucket.",
                 "stale-backup.md",
                 "Escalate when the complete inventory has no recent successful backup or retention is at risk.",
             )
-        if backup.restore_verified_at is None or backup.restore_verified_at < restore_before:
+        if latest_restore is None or latest_restore < restore_before:
             yield _finding(
                 "BKP-002",
                 Severity.MEDIUM,
                 resource,
                 "Restore verification is absent or old",
-                {"restore_verified_at": backup.restore_verified_at, "age_threshold_days": 30},
+                {
+                    "stream": backup.stream,
+                    "latest_restore_verified_at": latest_restore,
+                    "age_threshold_days": 30,
+                },
                 "Recovery usability has not been demonstrated recently by the supplied metadata.",
                 "Review the last isolated restore-test record; schedule a controlled test through change management.",
                 "stale-backup.md",
@@ -198,7 +220,12 @@ def backup_findings(snapshot: PlatformSnapshot, now: datetime) -> Iterable[Findi
                 Severity.HIGH,
                 resource,
                 "Backup protection metadata is incomplete",
-                {"checksum_present": backup.checksum_present, "encrypted": backup.encrypted},
+                {
+                    "stream": backup.stream,
+                    "latest_key": backup.key,
+                    "checksum_present": backup.checksum_present,
+                    "encrypted": backup.encrypted,
+                },
                 "Integrity or encryption evidence is absent in the export; the object itself was not accessed.",
                 "Confirm bucket policy, encryption headers, and checksum metadata using read-only API calls.",
                 "stale-backup.md",

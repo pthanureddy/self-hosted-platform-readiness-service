@@ -22,9 +22,8 @@ The `scripts/diagnose.sh` helper issues read-only Kubernetes commands. It does n
 
 ## Upgrade and rollback boundary
 
-Pin an immutable image digest, review the generated manifest, and observe error/latency metrics during a rollout. Rollback is an operator-controlled Helm/Argo action, not an application feature. Before rollback, determine whether response-schema consumers can tolerate the older version. Preserve failed request metadata, never submitted operational payloads unless policy explicitly permits it.
+Pin an immutable image digest, review the generated release-specific manifest, and observe error/latency metrics during a rollout. Rollback is an operator-controlled Helm/Argo action, not an application feature. Before rollback, determine whether response-schema consumers can tolerate the older version. Preserve failed request metadata, never submitted operational payloads unless policy explicitly permits it.
 
 ## Rule changes
 
 Treat rule IDs and response fields as an API contract. Add new IDs for materially different conditions; do not silently repurpose an existing ID. Test threshold boundaries, severity ordering, evidence fields, hypotheses, checks, runbook links, and escalation text.
-

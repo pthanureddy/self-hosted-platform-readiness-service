@@ -16,7 +16,12 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 
 from readiness_service.engine import analyze_snapshot
 from readiness_service.logging import configure_logging, get_logger
-from readiness_service.models import AnalysisResult, ErrorDetail, PlatformSnapshot
+from readiness_service.models import (
+    MAX_VALIDATION_ISSUES,
+    AnalysisResult,
+    ErrorDetail,
+    PlatformSnapshot,
+)
 from readiness_service.telemetry import configure_tracing
 
 REQUESTS = Counter("readiness_http_requests_total", "HTTP requests", ["method", "route", "status"])
@@ -44,7 +49,9 @@ app = FastAPI(
 
 @app.middleware("http")
 async def request_context(request: Request, call_next: Any) -> Response:
-    request_id = request.headers.get("x-request-id", str(uuid.uuid4()))[:128]
+    supplied_request_id = request.headers.get("x-request-id", "").strip()
+    request_id = (supplied_request_id or str(uuid.uuid4()))[:128]
+    request.state.request_id = request_id
     started = time.perf_counter()
     structlog.contextvars.bind_contextvars(request_id=request_id)
     try:
@@ -78,10 +85,11 @@ async def request_context(request: Request, call_next: Any) -> Response:
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
-    request_id = request.headers.get("x-request-id", "unknown")[:128]
+    request_id = request.state.request_id
+    errors = exc.errors()
     issues = [
         {"path": ".".join(str(part) for part in error["loc"]), "type": error["type"]}
-        for error in exc.errors()
+        for error in errors[:MAX_VALIDATION_ISSUES]
     ]
     return JSONResponse(
         status_code=422,
@@ -90,6 +98,8 @@ async def validation_error(request: Request, exc: RequestValidationError) -> JSO
             message="The snapshot does not match the required schema.",
             request_id=request_id,
             issues=issues,
+            total_issues=len(errors),
+            truncated=len(errors) > MAX_VALIDATION_ISSUES,
         ).model_dump(mode="json"),
     )
 

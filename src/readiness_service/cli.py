@@ -11,7 +11,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from readiness_service.engine import analyze_snapshot
-from readiness_service.models import PlatformSnapshot
+from readiness_service.models import MAX_VALIDATION_ISSUES, PlatformSnapshot
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,10 +29,37 @@ def build_parser() -> argparse.ArgumentParser:
 def run(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        raw = json.loads(args.snapshot.read_text(encoding="utf-8"))
+        content = args.snapshot.read_text(encoding="utf-8")
+    except OSError:
+        print(json.dumps({"error": "snapshot_unreadable"}), file=sys.stderr)
+        return 2
+    try:
+        raw = json.loads(content)
+    except json.JSONDecodeError as exc:
+        print(
+            json.dumps({"error": "invalid_json", "line": exc.lineno, "column": exc.colno}),
+            file=sys.stderr,
+        )
+        return 2
+    try:
         snapshot = PlatformSnapshot.model_validate(raw)
-    except (OSError, json.JSONDecodeError, ValidationError) as exc:
-        print(json.dumps({"error": "invalid_snapshot", "detail": str(exc)}), file=sys.stderr)
+    except ValidationError as exc:
+        errors = exc.errors()
+        issues = [
+            {"path": ".".join(str(part) for part in error["loc"]), "type": error["type"]}
+            for error in errors[:MAX_VALIDATION_ISSUES]
+        ]
+        print(
+            json.dumps(
+                {
+                    "error": "invalid_snapshot",
+                    "issues": issues,
+                    "total_issues": len(errors),
+                    "truncated": len(errors) > MAX_VALIDATION_ISSUES,
+                }
+            ),
+            file=sys.stderr,
+        )
         return 2
 
     result = analyze_snapshot(snapshot)

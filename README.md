@@ -9,7 +9,7 @@ The project is an independent engineering portfolio implementation. It is not af
 - Kubernetes workload readiness, failed state, and restarts
 - Argo CD application sync, health, and operation state
 - RabbitMQ backlog, consumer availability, throughput, and message age
-- S3-compatible backup age, checksum/encryption metadata, and restore-test evidence
+- S3-compatible backup-stream recency, latest-object protection metadata, and restore-test evidence
 - DNS, HTTP, and TLS probe exports
 - Logs, metrics, traces, and alerts coverage
 
@@ -39,18 +39,18 @@ On PowerShell, activate with `.venv\Scripts\Activate.ps1`. Use `--fail-on high` 
 | `GET /metrics` | Prometheus metrics |
 | `readiness SNAPSHOT.json` | Offline CLI analysis |
 
-Unknown input fields are rejected. Validation and internal errors use bounded responses and do not echo submitted values. The service logs request metadata and analysis counts, not entire snapshots.
+Unknown input fields and timestamps without a UTC offset are rejected. Numeric inputs are finite and bounded. API and CLI validation responses return paths/types for at most 20 issues, include total/truncation metadata, and never echo submitted values. Each backup object requires a logical `stream`; only the latest supplied object in each bucket/stream is checked for age and protection metadata. The service logs request metadata and analysis counts, not entire snapshots.
 
 ## Deployment evidence
 
 - Multi-stage, non-root, read-only compatible Docker image
-- Docker Compose observability lab with OTel Collector, Prometheus, Grafana, and optional Mimir/Loki/Tempo profiles
-- Hardened Helm chart plus `managed`, `dedicated`, `onprem`, and ephemeral `kind` values
-- Three Argo CD Application examples with pruning disabled
+- Docker Compose observability configuration lab with OTel Collector, Prometheus, Grafana, and optional Mimir/Loki/Tempo profiles; no remote write or log shipping is configured
+- Release-specific hardened Helm resources, tag-or-digest image references, and `managed`, `dedicated`, `onprem`, and ephemeral `kind` values
+- Three Argo CD Application examples pinned to `v0.1.0`; managed/dedicated disable pruning and on-prem sync is manual
 - Terraform namespace, quota, and limit-range bootstrap with mocked plan tests
 - GitHub Actions for Python quality, image build, Helm rendering, Terraform validation/tests, YAML policies, and a real ephemeral kind deployment smoke test
 
-These are testable deployment artifacts, not evidence that the service currently operates a live external platform. See [architecture](docs/architecture.md), [security boundaries](docs/security-boundaries.md), [setup](docs/setup.md), [operations](docs/operations.md), and [limitations](docs/limitations.md).
+These are testable deployment artifacts, not evidence that the service currently operates a live external platform. The chart's default external image reference will not resolve until an image is independently built and published; this repository does not claim that publication. See [architecture](docs/architecture.md), [security boundaries](docs/security-boundaries.md), [setup](docs/setup.md), [operations](docs/operations.md), and [limitations](docs/limitations.md).
 
 ## Rule behavior
 
