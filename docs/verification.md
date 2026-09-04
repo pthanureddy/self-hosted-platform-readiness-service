@@ -25,7 +25,7 @@ The test suite covers timezone-aware timestamps, finite bounded numbers, probe f
 
 ## Environment-limited checks
 
-The Docker 28.4.0 client was present, but its Linux daemon pipe was unavailable. Consequently, a local image build and local kind deployment were not represented as passed. The GitHub Actions workflow defines both an image build and an actual ephemeral kind smoke test that loads the image, installs the Helm chart, waits for rollout, checks readiness, posts `fixtures/degraded-snapshot.json`, and asserts `K8S-001`. That workflow has not run publicly because the repository has not yet been published.
+The Docker 28.4.0 client was present locally, but its Linux daemon pipe was unavailable, so no local image or kind result is claimed. Public [GitHub Actions run 33912715020](https://github.com/pthanureddy/self-hosted-platform-readiness-service/actions/runs/33912715020) passed the image builds and an ephemeral kind smoke deployment that loaded the image, installed the Helm chart, waited for rollout, checked readiness, posted `fixtures/degraded-snapshot.json`, and asserted `K8S-001`.
 
 ## Operational limitations
 
