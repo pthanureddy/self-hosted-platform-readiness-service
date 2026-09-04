@@ -1,0 +1,16 @@
+replicaCount: 1
+image:
+  repository: readiness-service
+  tag: kind
+  pullPolicy: Never
+podDisruptionBudget:
+  enabled: false
+networkPolicy:
+  enabled: false
+otel:
+  endpoint: ""
+serviceMonitor:
+  enabled: false
+prometheusRule:
+  enabled: false
+

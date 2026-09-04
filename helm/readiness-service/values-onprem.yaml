@@ -1,0 +1,7 @@
+replicaCount: 2
+image: {pullPolicy: IfNotPresent}
+podDisruptionBudget: {enabled: true, minAvailable: 1}
+otel: {endpoint: ""}
+serviceMonitor: {enabled: false}
+prometheusRule: {enabled: false}
+

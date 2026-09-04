@@ -1,0 +1,7 @@
+replicaCount: 2
+podDisruptionBudget: {enabled: true, minAvailable: 1}
+otel: {endpoint: "http://otel-collector.observability:4318"}
+serviceMonitor: {enabled: true}
+prometheusRule: {enabled: true}
+nodeSelector: {workload-tier: platform}
+

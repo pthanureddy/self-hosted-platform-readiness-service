@@ -1,0 +1,16 @@
+groups:
+  - name: readiness-service
+    rules:
+      - alert: ReadinessServiceUnavailable
+        expr: up{job="readiness"} == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: Readiness service scrape target is unavailable
+      - alert: ReadinessAnalysisErrorRate
+        expr: rate(readiness_analyses_total{outcome!="success"}[10m]) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: Readiness analysis errors are occurring
+

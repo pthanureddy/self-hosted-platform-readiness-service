@@ -1,0 +1,26 @@
+replicaCount: 2
+image:
+  repository: ghcr.io/pthanureddy/self-hosted-platform-readiness-service
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 80
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: 500m, memory: 256Mi}
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+networkPolicy:
+  enabled: true
+otel:
+  endpoint: ""
+serviceMonitor:
+  enabled: false
+prometheusRule:
+  enabled: false
+nodeSelector: {}
+tolerations: []
+affinity: {}
+

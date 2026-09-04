@@ -1,0 +1,24 @@
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+  - name: Mimir-compatible
+    uid: mimir
+    type: prometheus
+    access: proxy
+    url: http://mimir:9009/prometheus
+  - name: Loki-compatible
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+  - name: Tempo-compatible
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+

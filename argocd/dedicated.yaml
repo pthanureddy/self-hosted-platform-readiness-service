@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: {name: readiness-dedicated, namespace: argocd}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/pthanureddy/self-hosted-platform-readiness-service.git
+    targetRevision: main
+    path: helm/readiness-service
+    helm: {valueFiles: [values.yaml, values-dedicated.yaml]}
+  destination: {server: https://kubernetes.default.svc, namespace: readiness-dedicated}
+  syncPolicy:
+    automated: {prune: false, selfHeal: true}
+    syncOptions: [CreateNamespace=true]
+

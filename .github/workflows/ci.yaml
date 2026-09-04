@@ -1,0 +1,77 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11", cache: pip}
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev,otel]"
+      - run: ruff format --check .
+      - run: ruff check .
+      - run: mypy
+      - run: pytest --cov-report=term-missing --cov-report=xml
+
+  build-and-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - uses: azure/setup-helm@v4
+        with: {version: v3.16.3}
+      - uses: hashicorp/setup-terraform@v3
+        with: {terraform_version: 1.10.4}
+      - run: python -m pip install PyYAML
+      - run: python scripts/verify_static.py
+      - run: docker compose config --quiet
+      - run: docker build --tag readiness-service:ci .
+      - run: helm lint helm/readiness-service
+      - run: |
+          for values in values-kind.yaml values-managed.yaml values-dedicated.yaml values-onprem.yaml; do
+            helm template readiness helm/readiness-service --values "helm/readiness-service/$values" >/dev/null
+          done
+      - working-directory: terraform
+        run: terraform fmt -check -recursive
+      - working-directory: terraform
+        run: terraform init -backend=false
+      - working-directory: terraform
+        run: terraform validate
+      - working-directory: terraform
+        run: terraform test
+
+  kind-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1
+        with: {cluster_name: readiness-ci}
+      - uses: azure/setup-helm@v4
+        with: {version: v3.16.3}
+      - run: docker build --tag readiness-service:kind .
+      - run: kind load docker-image readiness-service:kind --name readiness-ci
+      - run: helm install readiness helm/readiness-service --namespace readiness-ci --create-namespace --values helm/readiness-service/values-kind.yaml
+      - run: kubectl rollout status deployment/readiness-service --namespace readiness-ci --timeout=120s
+      - name: Exercise deployed API
+        run: |
+          kubectl port-forward --namespace readiness-ci service/readiness-service 18080:80 >port-forward.log 2>&1 &
+          port_forward_pid=$!
+          trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:18080/health/ready && break
+            sleep 1
+          done
+          response="$(curl --fail --silent --show-error -H 'content-type: application/json' --data-binary @fixtures/degraded-snapshot.json http://127.0.0.1:18080/v1/analyze)"
+          echo "$response" | jq -e '.findings | any(.rule_id == "K8S-001")'
+      - if: always()
+        run: kubectl get all --namespace readiness-ci && kubectl logs --namespace readiness-ci deployment/readiness-service || true
+
