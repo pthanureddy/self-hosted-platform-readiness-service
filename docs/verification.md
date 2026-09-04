@@ -6,7 +6,7 @@ Local verification was completed on 2026-09-04 for the current repository revisi
 
 | Check | Command | Result |
 |---|---|---|
-| Formatting | `ruff format --check .` | 28 files already formatted |
+| Formatting | `ruff format --check .` | 29 files already formatted |
 | Lint | `ruff check .` | Passed |
 | Type safety | `mypy` | Passed; 9 source files |
 | Tests and coverage | `pytest -q` | 93 passed; 97.15% branch-aware coverage (380 statements, 76 branches) |
