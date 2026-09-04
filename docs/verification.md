@@ -1,0 +1,37 @@
+# Verification record
+
+Local verification was completed on 2026-09-04 before repository commits. The checks exercise the implementation and configuration; they are not evidence of a live external or production platform.
+
+## Completed checks
+
+| Check | Command | Result |
+|---|---|---|
+| Formatting | `ruff format --check .` | 28 files already formatted |
+| Lint | `ruff check .` | Passed |
+| Type safety | `mypy` | Passed; 9 source files |
+| Tests and coverage | `pytest -q` | 64 passed; 98.72% branch-aware coverage (334 statements, 56 branches) |
+| Static repository policy | `python scripts/verify_static.py` | Passed; 18 non-template YAML files parsed |
+| Shell syntax | `bash -n scripts/diagnose.sh scripts/smoke.sh` | Passed with GNU Bash 5.2.37 |
+| Compose model | `docker compose config --quiet` | Passed |
+| Helm | `helm lint helm/readiness-service` | Passed; 1 chart |
+| Helm profiles | `helm template` with kind, managed, dedicated, and on-prem values | All 4 rendered |
+| Terraform format | `terraform -chdir=terraform fmt -check -recursive` | Passed |
+| Terraform validation | `terraform -chdir=terraform validate` | Passed |
+| Terraform tests | `terraform -chdir=terraform test` | 2 passed, 0 failed with mocked Kubernetes provider |
+| Package | `python -m pip wheel --no-deps .` | Wheel built successfully |
+| CLI fixture | `readiness fixtures/degraded-snapshot.json --fail-on never` | Parsed; 13 ordered findings; first code `K8S-001` |
+
+The test suite covers model bounds and rejection, every rule family and threshold branches, deterministic ordering and summaries, API health/metrics/errors/OpenAPI behavior, CLI output and exit policies, logging setup, and optional tracing behavior.
+
+## Environment-limited checks
+
+The Docker 28.4.0 client was present, but its Linux daemon pipe was unavailable. Consequently, a local image build and local kind deployment were not represented as passed. The GitHub Actions workflow defines both an image build and an actual ephemeral kind smoke test that loads the image, installs the Helm chart, waits for rollout, checks readiness, posts `fixtures/degraded-snapshot.json`, and asserts `K8S-001`. That workflow has not run publicly because the repository has not yet been published.
+
+## Operational limitations
+
+- Rules evaluate caller-supplied exports and make no live platform calls.
+- No automated remediation is implemented.
+- Terraform tests use a mocked provider and do not apply resources.
+- Helm and Argo CD files are rendered configuration examples, not proof of managed, dedicated, or on-prem operation.
+- Mimir, Loki, and Tempo datasource/config examples are compatibility scaffolding for a disposable lab, not production observability evidence.
+- No production, customer, on-call, or platform-vendor affiliation claim is made.
