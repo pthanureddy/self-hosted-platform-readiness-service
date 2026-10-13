@@ -24,7 +24,10 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: linux-deployment-evidence
-          path: artifacts/
+          path: |
+            artifacts/*.log
+            artifacts/*.json
+            artifacts/*.txt
       - if: always()
         run: sudo journalctl -u readiness-lab --no-pager -n 30 || true
 

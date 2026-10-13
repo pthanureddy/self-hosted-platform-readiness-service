@@ -50,7 +50,9 @@ configuration, not proof of a security audit or availability SLA.
 Unchanged reapply uses the same wheel identity and service configuration; the
 verification script requires zero Ansible changes on its second application.
 Candidate configuration is activated only after installation. If readiness
-fails, the previous unit text is restored and its service restarted. A failed
+fails, the previous unit text is restored and its service restarted. Recovery
+waits for the previous configuration's readiness endpoint before reporting the
+failed candidate. A failed
 first installation stops/disables its new service and removes only its unit.
 Package install and artifact copy failures occur before unit activation.
 Recovery is attempted, not guaranteed in an arbitrary broken operating system.

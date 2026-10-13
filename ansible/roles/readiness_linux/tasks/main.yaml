@@ -118,11 +118,24 @@
         state: restarted
       when: readiness_previous_unit_stat.stat.exists
     - name: Stop a failed first installation
+      when: not readiness_previous_unit_stat.stat.exists
       ansible.builtin.systemd_service:
         name: "{{ readiness_service_name }}"
         state: stopped
         enabled: false
-      when: not readiness_previous_unit_stat.stat.exists
+    - name: Wait for restored configuration readiness
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ (readiness_previous_unit.content | b64decode | regex_findall('--port ([0-9]+)') | first) }}/health/ready"
+        status_code: 200
+        return_content: true
+        use_proxy: false
+        timeout: 2
+      register: readiness_recovered
+      until: readiness_recovered.status == 200 and readiness_recovered.json.status | default('') == 'ready'
+      retries: 8
+      delay: 1
+      changed_when: false
+      when: readiness_previous_unit_stat.stat.exists
     - name: Remove only failed first service unit
       ansible.builtin.file:
         path: "/etc/systemd/system/{{ readiness_service_name }}.service"
