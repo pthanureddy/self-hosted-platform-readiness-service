@@ -1,6 +1,44 @@
 # Verification record
 
-Local verification was completed on 2026-09-04 for the current repository revision. The checks exercise the implementation and configuration; they are not evidence of a live external or production platform.
+Baseline verification was completed on 2026-09-04. The checks exercise the implementation and configuration; they are not evidence of a live external or production platform. The 13 October extension record below supersedes baseline test counts for the current source.
+
+## 13 October 2026 Linux deployment extension
+
+Implementation revision `bf1a473b9f9354301d1665833a2588efc7614444` passed
+[all four hosted CI jobs](https://github.com/pthanureddy/self-hosted-platform-readiness-service/actions/runs/38437328812):
+Python quality, package/container/static/Terraform checks, actual kind smoke
+deployment, and the new actual Ubuntu24.04 Ansible/systemd installation campaign.
+
+- Local Python3.12.14: **118 tests passed**, **97.70% combined statement/branch
+  coverage** (464/476 statements,87/88 branches). This coverage concerns
+  Python implementation, not Ansible task completeness or field reliability.
+- Ruff lint and32-file formatting check passed; mypy checked10 source files.
+- Package wheel build, dependency consistency,21 YAML policy checks, Bash
+  syntax and degraded fixture execution passed. The fixture returned13 findings.
+- Ubuntu installation succeeded. Second Ansible apply reported **changed=0**.
+- Actual service passed **7/7 TCP/HTTP/response checks**, before and after a
+  failed-candidate recovery. Systemd properties confirmed the dedicated user,
+  NoNewPrivileges, PrivateTmp, ProtectSystem=strict and ProtectHome controls.
+- The occupied-port candidate failed as expected; the previous unit was
+  restored, restarted and awaited for readiness before recovery checks passed.
+- Two Terraform **mocked provider plan** cases passed. No resources were applied.
+
+The first integration attempt exposed controller3.11 versus target3.12 wheel
+ABI mismatch; the build now uses the service's target interpreter. The next
+attempt exposed a recovery-startup race; recovery now waits for its original
+readiness endpoint. These failures were fixed and the full final campaign passed.
+Hosted artifacts retain install/idempotence/recovery logs and bounded check
+reports. Virtual-environment contents are excluded from published CI artifacts.
+
+Windows has no running Docker Linux daemon, so no local Linux/container result
+is claimed. A local background-service smoke command was blocked by automatic
+approval review; it was not retried through another process-launch mechanism.
+The actual-service evidence above comes from the hosted Linux campaign. Local
+unit-test HTTP endpoints are separate controlled fixtures.
+
+No physical device, customer deployment, hypervisor operation, production uptime
+or security certification is claimed. The extension's code, tests and documents
+were developed with Codex assistance; see [Linux deployment boundaries](linux-deployment.md).
 
 ## Completed checks
 
