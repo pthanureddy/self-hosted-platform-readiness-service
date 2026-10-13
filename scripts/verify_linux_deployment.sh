@@ -4,7 +4,12 @@ set -Eeuo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repository_root"
 mkdir -p artifacts wheelhouse
-python -m pip wheel . --wheel-dir wheelhouse
+ansible readiness_lab -i ansible/inventory.ini --become \
+  --module-name ansible.builtin.package --args 'name=python3-venv state=present'
+# Build binary dependencies for the same interpreter used by the installed unit.
+/usr/bin/python3 -m venv artifacts/wheel-builder
+artifacts/wheel-builder/bin/python --version | tee artifacts/wheel-builder-version.txt
+artifacts/wheel-builder/bin/python -m pip wheel . --wheel-dir wheelhouse
 application_wheel="$(find "$repository_root/wheelhouse" -maxdepth 1 -name 'self_hosted_platform_readiness_service-*.whl' -print -quit)"
 application_sha="$(sha256sum "$application_wheel" | cut -d ' ' -f 1)"
 python - "$application_wheel" "$application_sha" "$repository_root/wheelhouse" <<'PY'

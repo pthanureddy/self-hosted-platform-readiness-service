@@ -27,8 +27,10 @@ The script expects passwordless sudo in its disposable CI host. For an attended
 installation, prepare the wheelhouse and variables, then invoke the same
 playbook with `--ask-become-pass`. No passwords are stored in inventory.
 
-`pip wheel . --wheel-dir wheelhouse` prepares application and dependency
-wheels. The script records the application wheel SHA256 and passes the exact
+The Bash campaign prepares wheels with `/usr/bin/python3` in a separate build
+virtual environment, matching the installed service interpreter's binary ABI.
+The Ansible controller may use another supported Python version. The script
+records the application wheel SHA256 and passes the exact
 controller paths to Ansible. The role checks that digest before target changes.
 Ansible installs from the copied wheelhouse with `--no-index`. Application
 digest identity is not a signature check or a hash lock of every dependency.
