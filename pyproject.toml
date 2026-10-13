@@ -37,6 +37,7 @@ dev = [
 
 [project.scripts]
 readiness = "readiness_service.cli:main"
+readiness-deployment-check = "readiness_service.deployment:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/readiness_service"]

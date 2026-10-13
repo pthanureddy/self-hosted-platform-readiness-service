@@ -1,0 +1,9 @@
+---
+readiness_root: /opt/readiness-service-lab
+readiness_user: readiness-lab
+readiness_service_name: readiness-lab
+readiness_port: 18080
+readiness_python: /usr/bin/python3
+readiness_package_version: "0.1.0"
+# Required controller values: readiness_wheel, readiness_wheelhouse,
+# readiness_expected_sha256. The application wheel is checked before installation.

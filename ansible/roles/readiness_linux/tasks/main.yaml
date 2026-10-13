@@ -1,0 +1,133 @@
+---
+- name: Validate target and bounded lab configuration
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system == 'Linux'
+      - ansible_facts.service_mgr == 'systemd'
+      - ansible_facts.os_family == 'Debian'
+      - readiness_root is match('^/opt/readiness-[a-zA-Z0-9_-]+$')
+      - readiness_user is match('^[a-z][a-z0-9-]{1,24}$')
+      - readiness_service_name is match('^readiness-[a-z0-9-]+$')
+      - readiness_port is integer
+      - readiness_port >= 1024 and readiness_port <= 65535
+      - readiness_python == '/usr/bin/python3'
+      - readiness_expected_sha256 is match('^[a-f0-9]{64}$')
+      - readiness_package_version is match('^[0-9]+\.[0-9]+\.[0-9]+$')
+    fail_msg: Unsupported target or invalid lab configuration
+- name: Check application wheel on controller
+  ansible.builtin.stat:
+    path: "{{ readiness_wheel }}"
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  become: false
+  register: readiness_wheel_stat
+- name: Check exact application wheel digest
+  ansible.builtin.assert:
+    that:
+      - readiness_wheel_stat.stat.isreg | default(false)
+      - readiness_wheel_stat.stat.checksum == readiness_expected_sha256
+      - readiness_wheel | basename is match('^self_hosted_platform_readiness_service-.*\.whl$')
+    fail_msg: Application wheel is missing or its digest does not match
+- name: Set immutable artifact release directory
+  ansible.builtin.set_fact:
+    readiness_release: "{{ readiness_root }}/releases/{{ readiness_expected_sha256 }}"
+- name: Install virtual-environment prerequisites
+  ansible.builtin.package:
+    name: [python3-venv, python3-setuptools]
+    state: present
+- name: Create dedicated non-login service account
+  ansible.builtin.user:
+    name: "{{ readiness_user }}"
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+- name: Create root-owned artifact directory
+  ansible.builtin.file:
+    path: "{{ readiness_release }}/wheelhouse"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+- name: Copy prepared wheelhouse from controller
+  ansible.builtin.copy:
+    src: "{{ readiness_wheelhouse }}/"
+    dest: "{{ readiness_release }}/wheelhouse/"
+    owner: root
+    group: root
+    mode: "0644"
+    directory_mode: "0755"
+- name: Create per-artifact virtual environment
+  ansible.builtin.command:
+    argv: ["{{ readiness_python }}", -m, venv, "{{ readiness_release }}/venv"]
+    creates: "{{ readiness_release }}/venv/bin/python"
+- name: Install package using only prepared wheels
+  ansible.builtin.pip:
+    name: "self-hosted-platform-readiness-service=={{ readiness_package_version }}"
+    virtualenv: "{{ readiness_release }}/venv"
+    extra_args: "--no-index --find-links={{ readiness_release }}/wheelhouse"
+- name: Locate previous service unit
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ readiness_service_name }}.service"
+  register: readiness_previous_unit_stat
+- name: Retain previous service configuration for recovery
+  ansible.builtin.slurp:
+    src: "/etc/systemd/system/{{ readiness_service_name }}.service"
+  when: readiness_previous_unit_stat.stat.exists
+  register: readiness_previous_unit
+- name: Activate candidate configuration and verify service
+  block:
+    - name: Install confined systemd service configuration
+      ansible.builtin.template:
+        src: readiness.service.j2
+        dest: "/etc/systemd/system/{{ readiness_service_name }}.service"
+        owner: root
+        group: root
+        mode: "0644"
+      register: readiness_unit_changed
+    - name: Start or restart only when configuration changed
+      ansible.builtin.systemd_service:
+        name: "{{ readiness_service_name }}"
+        daemon_reload: "{{ readiness_unit_changed.changed }}"
+        state: "{{ 'restarted' if readiness_unit_changed.changed else 'started' }}"
+        enabled: true
+    - name: Verify candidate readiness on loopback
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ readiness_port }}/health/ready"
+        status_code: 200
+        return_content: true
+        use_proxy: false
+        timeout: 2
+      register: readiness_health
+      until: readiness_health.status == 200 and readiness_health.json.status | default('') == 'ready'
+      retries: 8
+      delay: 1
+      changed_when: false
+  rescue:
+    - name: Restore previous unit when available
+      ansible.builtin.copy:
+        content: "{{ readiness_previous_unit.content | b64decode }}"
+        dest: "/etc/systemd/system/{{ readiness_service_name }}.service"
+        owner: root
+        group: root
+        mode: "0644"
+      when: readiness_previous_unit_stat.stat.exists
+    - name: Restart restored service
+      ansible.builtin.systemd_service:
+        name: "{{ readiness_service_name }}"
+        daemon_reload: true
+        state: restarted
+      when: readiness_previous_unit_stat.stat.exists
+    - name: Stop a failed first installation
+      ansible.builtin.systemd_service:
+        name: "{{ readiness_service_name }}"
+        state: stopped
+        enabled: false
+      when: not readiness_previous_unit_stat.stat.exists
+    - name: Remove only failed first service unit
+      ansible.builtin.file:
+        path: "/etc/systemd/system/{{ readiness_service_name }}.service"
+        state: absent
+      when: not readiness_previous_unit_stat.stat.exists
+    - name: Report deployment failure after recovery attempt
+      ansible.builtin.fail:
+        msg: Candidate readiness failed; previous unit restored when available. Review service logs.

@@ -1,0 +1,25 @@
+[Unit]
+Description=Readiness service loopback integration lab
+After=network.target
+
+[Service]
+Type=simple
+User={{ readiness_user }}
+Group={{ readiness_user }}
+WorkingDirectory={{ readiness_release }}
+ExecStart={{ readiness_release }}/venv/bin/python -m uvicorn readiness_service.api:app --host 127.0.0.1 --port {{ readiness_port }}
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

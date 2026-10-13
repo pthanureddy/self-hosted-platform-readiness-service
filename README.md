@@ -43,6 +43,13 @@ Unknown input fields and timestamps without a UTC offset are rejected. Numeric i
 
 ## Deployment evidence
 
+- Ansible wheel-based Linux installation with a dedicated non-login account,
+  confined loopback systemd service, digest-specific virtual environments,
+  idempotent reapply and previous-unit recovery when candidate readiness fails.
+- Python TCP/HTTP deployment checks, Bash verification automation and Ubuntu CI
+  covering actual installation, configuration, seven contract checks and rollback.
+  See [Linux deployment](docs/linux-deployment.md) for prerequisites and scope.
+
 - Multi-stage, non-root, read-only compatible Docker image
 - Docker Compose observability configuration lab with OTel Collector, Prometheus, Grafana, and optional Mimir/Loki/Tempo profiles; no remote write or log shipping is configured
 - Release-specific hardened Helm resources, tag-or-digest image references, and `managed`, `dedicated`, `onprem`, and ephemeral `kind` values

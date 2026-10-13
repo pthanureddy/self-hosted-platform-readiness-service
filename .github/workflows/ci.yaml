@@ -8,6 +8,26 @@ permissions:
   contents: read
 
 jobs:
+  linux-deployment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with: {python-version: "3.11"}
+      - run: python -m pip install -e ".[dev]" 'ansible-core>=2.18,<2.20'
+      - run: ansible-playbook -i ansible/inventory.ini ansible/deploy.yaml --syntax-check
+      - run: bash -n scripts/verify_linux_deployment.sh
+      - run: shellcheck scripts/verify_linux_deployment.sh
+      - run: bash scripts/verify_linux_deployment.sh
+      - if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-deployment-evidence
+          path: artifacts/
+      - if: always()
+        run: sudo journalctl -u readiness-lab --no-pager -n 30 || true
+
   python-quality:
     runs-on: ubuntu-latest
     steps:

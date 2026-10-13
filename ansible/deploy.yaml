@@ -1,0 +1,7 @@
+---
+- name: Install and verify the loopback readiness lab service
+  hosts: readiness_lab
+  become: true
+  gather_facts: true
+  roles:
+    - readiness_linux
